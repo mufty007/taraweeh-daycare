@@ -103,7 +103,7 @@ export async function getRegisteredChildren(): Promise<ChildrenResponse> {
 }
 
 export async function getTodayAttendance(): Promise<AttendanceResponse> {
-  const url = `${SCRIPT_URL}?action=getTodayAttendance`;
+  const url = `${SCRIPT_URL}?action=getAttendance`;
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error('Failed to fetch attendance');
@@ -112,17 +112,23 @@ export async function getTodayAttendance(): Promise<AttendanceResponse> {
 }
 
 export async function checkInChild(data: CheckInData): Promise<ActionResponse> {
-  const params = new URLSearchParams({
-    action: 'checkIn',
-    childName: data.childName,
-    parentName: data.parentName,
-    parentPhone: data.parentPhone,
-    checkInTime: data.checkInTime || getCurrentTime(),
-    dropOffPerson: data.dropOffPerson,
+  const response = await fetch(SCRIPT_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'text/plain',
+    },
+    body: JSON.stringify({
+      action: 'checkIn',
+      data: {
+        childName: data.childName,
+        parentName: data.parentName,
+        parentPhone: data.parentPhone,
+        checkInTime: data.checkInTime || getCurrentTime(),
+        dropOffPerson: data.dropOffPerson,
+      }
+    })
   });
   
-  const url = `${SCRIPT_URL}?${params.toString()}`;
-  const response = await fetch(url);
   if (!response.ok) {
     throw new Error('Failed to check in');
   }
@@ -130,15 +136,21 @@ export async function checkInChild(data: CheckInData): Promise<ActionResponse> {
 }
 
 export async function checkOutChild(data: CheckOutData): Promise<ActionResponse> {
-  const params = new URLSearchParams({
-    action: 'checkOut',
-    childName: data.childName,
-    checkOutTime: data.checkOutTime || getCurrentTime(),
-    pickUpPerson: data.pickUpPerson,
+  const response = await fetch(SCRIPT_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'text/plain',
+    },
+    body: JSON.stringify({
+      action: 'checkOut',
+      data: {
+        childName: data.childName,
+        checkOutTime: data.checkOutTime || getCurrentTime(),
+        pickUpPerson: data.pickUpPerson,
+      }
+    })
   });
   
-  const url = `${SCRIPT_URL}?${params.toString()}`;
-  const response = await fetch(url);
   if (!response.ok) {
     throw new Error('Failed to check out');
   }
@@ -146,48 +158,29 @@ export async function checkOutChild(data: CheckOutData): Promise<ActionResponse>
 }
 
 export async function getAttendanceHistory(): Promise<HistoryRecord[]> {
-  const url = `${SCRIPT_URL}?action=getHistory`;
+  // Use getAttendance to fetch today's data since script doesn't have getHistory action
+  const url = `${SCRIPT_URL}?action=getAttendance`;
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error('Failed to fetch history');
   }
   const json = await response.json();
   
-  // Handle the response - may return history array or error
-  if (json.error) {
-    // If no getHistory action, fall back to getting all attendance
-    const fallbackUrl = `${SCRIPT_URL}?action=getTodayAttendance`;
-    const fallbackRes = await fetch(fallbackUrl);
-    const fallbackJson = await fallbackRes.json();
-    
-    if (fallbackJson.attendance) {
-      return Object.entries(fallbackJson.attendance).map(([childName, data]) => {
-        const record = data as AttendanceRecord;
-        return {
-          date: fallbackJson.date || new Date().toLocaleDateString(),
-          childName,
-          parentName: '',
-          parentPhone: '',
-          checkInTime: record.checkInTime || '',
-          droppedOffBy: record.dropOffPerson || '',
-          checkOutTime: '',
-          pickedUpBy: '',
-        };
-      });
-    }
-    return [];
+  if (json.attendance) {
+    return Object.entries(json.attendance).map(([childName, data]) => {
+      const record = data as AttendanceRecord;
+      return {
+        date: json.date || new Date().toLocaleDateString(),
+        childName,
+        parentName: '',
+        parentPhone: '',
+        checkInTime: record.checkInTime || '',
+        droppedOffBy: record.dropOffPerson || '',
+        checkOutTime: '',
+        pickedUpBy: '',
+      };
+    });
   }
   
-  // Map snake_case to camelCase if needed
-  const records = json.history || json.data || [];
-  return records.map((r: Record<string, unknown>) => ({
-    date: r.date || '',
-    childName: r.childName || r.child_name || '',
-    parentName: r.parentName || r.parent_name || '',
-    parentPhone: r.parentPhone || r.parent_phone || '',
-    checkInTime: r.checkInTime || r.check_in_time || '',
-    droppedOffBy: r.droppedOffBy || r.dropped_off_by || '',
-    checkOutTime: r.checkOutTime || r.check_out_time || '',
-    pickedUpBy: r.pickedUpBy || r.picked_up_by || '',
-  }));
+  return [];
 }
