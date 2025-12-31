@@ -1,18 +1,21 @@
 import { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { StatsCards } from '@/components/StatsCards';
 import { SearchBar } from '@/components/SearchBar';
 import { ChildList } from '@/components/ChildList';
 import { ViewToggle } from '@/components/ViewToggle';
+import { StatusFilter, FilterStatus } from '@/components/StatusFilter';
 import { useAttendance } from '@/hooks/useAttendance';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
-import { RefreshCw, Loader2 } from 'lucide-react';
+import { RefreshCw, Loader2, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const Index = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [statusFilter, setStatusFilter] = useState<FilterStatus>('all');
   const { 
     children, 
     getChildStatus, 
@@ -26,14 +29,33 @@ const Index = () => {
   } = useAttendance();
 
   const filteredChildren = useMemo(() => {
-    if (!searchQuery.trim()) return children;
+    let result = children;
     
-    const query = searchQuery.toLowerCase();
-    return children.filter(child => 
-      child.name.toLowerCase().includes(query) ||
-      child.parentName.toLowerCase().includes(query)
-    );
-  }, [children, searchQuery]);
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(child => 
+        child.name.toLowerCase().includes(query) ||
+        child.parentName.toLowerCase().includes(query)
+      );
+    }
+    
+    // Filter by status
+    if (statusFilter !== 'all') {
+      result = result.filter(child => getChildStatus(child.id) === statusFilter);
+    }
+    
+    return result;
+  }, [children, searchQuery, statusFilter, getChildStatus]);
+
+  const filterCounts = useMemo(() => {
+    return {
+      all: children.length,
+      'checked-in': children.filter(c => getChildStatus(c.id) === 'checked-in').length,
+      'checked-out': children.filter(c => getChildStatus(c.id) === 'checked-out').length,
+      'not-checked-in': children.filter(c => getChildStatus(c.id) === 'not-checked-in').length,
+    };
+  }, [children, getChildStatus]);
 
   const handleCheckIn = async (childId: string, droppedOffBy: string) => {
     const child = children.find(c => c.id === childId);
@@ -87,8 +109,22 @@ const Index = () => {
                   )}
                 </Button>
               </div>
-              <ViewToggle viewMode={viewMode} onViewChange={setViewMode} />
+              <div className="flex items-center gap-2">
+                <Link to="/history">
+                  <Button variant="outline" size="sm">
+                    <History className="w-4 h-4 mr-2" />
+                    History
+                  </Button>
+                </Link>
+                <ViewToggle viewMode={viewMode} onViewChange={setViewMode} />
+              </div>
             </div>
+            
+            <StatusFilter 
+              value={statusFilter} 
+              onChange={setStatusFilter} 
+              counts={filterCounts}
+            />
             
             <div className="w-full sm:max-w-md">
               <SearchBar value={searchQuery} onChange={setSearchQuery} />

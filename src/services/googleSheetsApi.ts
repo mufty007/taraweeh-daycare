@@ -15,6 +15,17 @@ export interface AttendanceRecord {
   dropOffPerson: string;
 }
 
+export interface HistoryRecord {
+  date: string;
+  childName: string;
+  parentName: string;
+  parentPhone: string;
+  checkInTime: string;
+  droppedOffBy: string;
+  checkOutTime: string;
+  pickedUpBy: string;
+}
+
 export interface ChildrenResponse {
   children: RegistrationChild[];
   count: number;
@@ -132,4 +143,51 @@ export async function checkOutChild(data: CheckOutData): Promise<ActionResponse>
     throw new Error('Failed to check out');
   }
   return response.json();
+}
+
+export async function getAttendanceHistory(): Promise<HistoryRecord[]> {
+  const url = `${SCRIPT_URL}?action=getHistory`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error('Failed to fetch history');
+  }
+  const json = await response.json();
+  
+  // Handle the response - may return history array or error
+  if (json.error) {
+    // If no getHistory action, fall back to getting all attendance
+    const fallbackUrl = `${SCRIPT_URL}?action=getTodayAttendance`;
+    const fallbackRes = await fetch(fallbackUrl);
+    const fallbackJson = await fallbackRes.json();
+    
+    if (fallbackJson.attendance) {
+      return Object.entries(fallbackJson.attendance).map(([childName, data]) => {
+        const record = data as AttendanceRecord;
+        return {
+          date: fallbackJson.date || new Date().toLocaleDateString(),
+          childName,
+          parentName: '',
+          parentPhone: '',
+          checkInTime: record.checkInTime || '',
+          droppedOffBy: record.dropOffPerson || '',
+          checkOutTime: '',
+          pickedUpBy: '',
+        };
+      });
+    }
+    return [];
+  }
+  
+  // Map snake_case to camelCase if needed
+  const records = json.history || json.data || [];
+  return records.map((r: Record<string, unknown>) => ({
+    date: r.date || '',
+    childName: r.childName || r.child_name || '',
+    parentName: r.parentName || r.parent_name || '',
+    parentPhone: r.parentPhone || r.parent_phone || '',
+    checkInTime: r.checkInTime || r.check_in_time || '',
+    droppedOffBy: r.droppedOffBy || r.dropped_off_by || '',
+    checkOutTime: r.checkOutTime || r.check_out_time || '',
+    pickedUpBy: r.pickedUpBy || r.picked_up_by || '',
+  }));
 }
