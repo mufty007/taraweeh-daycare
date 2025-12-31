@@ -68,11 +68,31 @@ export async function getRegisteredChildren(): Promise<ChildrenResponse> {
   if (!response.ok) {
     throw new Error('Failed to fetch children');
   }
-  return response.json();
+  const json = await response.json();
+  
+  // Handle both possible response formats (children array or data array)
+  const rawChildren = json.children || json.data || [];
+  
+  // Map snake_case to camelCase if needed
+  const children: RegistrationChild[] = rawChildren.map((c: Record<string, unknown>) => ({
+    id: c.id || c.Id || 0,
+    childName: c.childName || c.child_name || '',
+    parentName: c.parentName || c.parent_name || '',
+    parentPhone: c.parentPhone || c.parent_phone || '',
+    parentEmail: c.parentEmail || c.parent_email || '',
+    allergies: c.allergies || c.allergies_medical_notes || 'None',
+  }));
+  
+  return {
+    children,
+    count: children.length,
+    timestamp: json.timestamp || new Date().toISOString(),
+    error: json.error,
+  };
 }
 
 export async function getTodayAttendance(): Promise<AttendanceResponse> {
-  const url = `${SCRIPT_URL}?action=getAttendance`;
+  const url = `${SCRIPT_URL}?action=getTodayAttendance`;
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error('Failed to fetch attendance');
