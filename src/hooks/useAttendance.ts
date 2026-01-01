@@ -103,9 +103,9 @@ export function useAttendance() {
 
     const checkInTime = getCurrentTime();
     
-    // Optimistic update
+    // Create new record (clear previous checkout to allow re-check-in)
     const newRecord: AttendanceRecord = {
-      id: `${new Date().toLocaleDateString()}-${childId}`,
+      id: `${new Date().toLocaleDateString()}-${childId}-${Date.now()}`,
       date: new Date().toLocaleDateString(),
       childId,
       childName: child.name,

@@ -133,11 +133,16 @@ export function ChildCard({ child, status, record, onCheckIn, onCheckOut }: Chil
               </Button>
             )}
 
-            {status === 'checked-out' && (
-              <div className="flex items-center gap-1.5 text-success">
-                <Check className="w-4 h-4" />
-                <span className="text-sm font-medium">Complete</span>
-              </div>
+            {status === 'checked-out' && !showCheckIn && (
+              <Button
+                variant="checkin"
+                size="sm"
+                onClick={() => setShowCheckIn(true)}
+                className="gap-2"
+              >
+                <LogIn className="w-4 h-4" />
+                Check In Again
+              </Button>
             )}
           </div>
         </div>
