@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { StatsCards } from '@/components/StatsCards';
@@ -12,10 +12,13 @@ import { toast } from 'sonner';
 import { RefreshCw, Loader2, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
+const ITEMS_PER_PAGE = 12;
+
 const Index = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [statusFilter, setStatusFilter] = useState<FilterStatus>('all');
+  const [currentPage, setCurrentPage] = useState(1);
   const { 
     children, 
     getChildStatus, 
@@ -47,6 +50,17 @@ const Index = () => {
     
     return result;
   }, [children, searchQuery, statusFilter, getChildStatus]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter]);
+
+  const totalPages = Math.ceil(filteredChildren.length / ITEMS_PER_PAGE);
+  const paginatedChildren = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredChildren.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredChildren, currentPage]);
 
   const filterCounts = useMemo(() => {
     return {
@@ -143,12 +157,16 @@ const Index = () => {
             </div>
           ) : (
             <ChildList
-              children={filteredChildren}
+              children={paginatedChildren}
               getStatus={getChildStatus}
               getRecord={getChildRecord}
               onCheckIn={handleCheckIn}
               onCheckOut={handleCheckOut}
               viewMode={viewMode}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              totalItems={filteredChildren.length}
             />
           )}
         </div>
