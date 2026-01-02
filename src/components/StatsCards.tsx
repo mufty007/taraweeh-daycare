@@ -19,33 +19,33 @@ export function StatsCards({ stats, isLoading }: StatsCardsProps) {
       title: 'Total Enrolled',
       value: stats.total,
       icon: Users,
-      gradient: 'from-primary/20 to-primary/5',
-      iconBg: 'bg-primary/10',
-      iconColor: 'text-primary',
+      bgColor: 'bg-primary',
+      textColor: 'text-primary-foreground',
+      iconBg: 'bg-primary-foreground/20',
     },
     {
       title: 'Checked In',
       value: stats.checkedIn,
       icon: UserCheck,
-      gradient: 'from-success/20 to-success/5',
-      iconBg: 'bg-success/10',
-      iconColor: 'text-success',
+      bgColor: 'bg-success',
+      textColor: 'text-success-foreground',
+      iconBg: 'bg-success-foreground/20',
     },
     {
       title: 'Checked Out',
       value: stats.checkedOut,
       icon: Clock,
-      gradient: 'from-accent/30 to-accent/10',
-      iconBg: 'bg-accent/20',
-      iconColor: 'text-accent-foreground',
+      bgColor: 'bg-accent',
+      textColor: 'text-accent-foreground',
+      iconBg: 'bg-accent-foreground/20',
     },
     {
       title: 'Not Arrived',
       value: stats.notCheckedIn,
       icon: UserX,
-      gradient: 'from-muted to-muted/50',
-      iconBg: 'bg-muted-foreground/10',
-      iconColor: 'text-muted-foreground',
+      bgColor: 'bg-secondary',
+      textColor: 'text-secondary-foreground',
+      iconBg: 'bg-secondary-foreground/20',
     },
   ];
 
@@ -55,22 +55,22 @@ export function StatsCards({ stats, isLoading }: StatsCardsProps) {
         <div
           key={card.title}
           className={cn(
-            'relative overflow-hidden rounded-2xl border border-border p-5 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5',
-            `bg-gradient-to-br ${card.gradient}`
+            'relative overflow-hidden rounded-2xl p-6 transition-all duration-300 hover:shadow-xl hover:-translate-y-1',
+            card.bgColor
           )}
           style={{ animationDelay: `${index * 0.1}s` }}
         >
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground mb-1">{card.title}</p>
+              <p className={cn('text-sm font-medium mb-2 opacity-80', card.textColor)}>{card.title}</p>
               {isLoading ? (
-                <div className="h-9 w-12 bg-muted rounded animate-pulse" />
+                <div className="h-10 w-14 bg-white/20 rounded animate-pulse" />
               ) : (
-                <p className="text-3xl font-bold text-foreground tracking-tight">{card.value}</p>
+                <p className={cn('text-4xl font-bold tracking-tight', card.textColor)}>{card.value}</p>
               )}
             </div>
-            <div className={cn('p-2.5 rounded-xl', card.iconBg)}>
-              <card.icon className={cn('w-5 h-5', card.iconColor)} />
+            <div className={cn('p-3 rounded-xl', card.iconBg)}>
+              <card.icon className={cn('w-6 h-6', card.textColor)} />
             </div>
           </div>
         </div>
