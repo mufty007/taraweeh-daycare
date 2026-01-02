@@ -37,19 +37,25 @@ export function ChildCard({ child, status, record, onCheckIn, onCheckOut }: Chil
 
   const statusConfig = {
     'not-checked-in': {
-      border: 'border-border hover:border-primary/30',
-      badge: 'bg-muted text-muted-foreground border border-border',
+      bg: 'bg-gradient-to-br from-card to-muted/30',
+      border: 'border-border/60 hover:border-primary/40',
+      badge: 'bg-muted text-muted-foreground',
       badgeText: 'Not Arrived',
+      badgeDot: 'bg-muted-foreground',
     },
     'checked-in': {
-      border: 'border-success/40 hover:border-success/60',
-      badge: 'bg-success/10 text-success border border-success/30',
+      bg: 'bg-gradient-to-br from-success/5 to-success/10',
+      border: 'border-success/30 hover:border-success/50',
+      badge: 'bg-success/15 text-success',
       badgeText: 'Checked In',
+      badgeDot: 'bg-success',
     },
     'checked-out': {
-      border: 'border-accent/40 hover:border-accent/60',
-      badge: 'bg-accent/10 text-accent-foreground border border-accent/30',
+      bg: 'bg-gradient-to-br from-accent/5 to-accent/15',
+      border: 'border-accent/30 hover:border-accent/50',
+      badge: 'bg-accent/20 text-accent-foreground',
       badgeText: 'Checked Out',
+      badgeDot: 'bg-accent',
     },
   };
 
@@ -57,139 +63,172 @@ export function ChildCard({ child, status, record, onCheckIn, onCheckOut }: Chil
 
   return (
     <div className={cn(
-      'rounded-xl border bg-card p-5 transition-all duration-300 animate-slide-up shadow-sm hover:shadow-md',
+      'group relative rounded-2xl border-2 p-6 transition-all duration-300 animate-slide-up hover:shadow-lg hover:-translate-y-1',
+      config.bg,
       config.border
     )}>
-      <div className="flex items-start gap-4">
-        {/* Avatar */}
-        <div className="flex-shrink-0 flex items-center justify-center w-12 h-12 rounded-full bg-muted border border-border">
-          <User className="w-6 h-6 text-muted-foreground" />
+      {/* Status indicator dot */}
+      <div className={cn('absolute top-4 right-4 w-2.5 h-2.5 rounded-full animate-pulse', config.badgeDot)} />
+
+      {/* Header with Avatar and Name */}
+      <div className="flex items-center gap-4 mb-4">
+        <div className={cn(
+          'flex-shrink-0 flex items-center justify-center w-14 h-14 rounded-2xl transition-transform duration-300 group-hover:scale-105',
+          status === 'checked-in' ? 'bg-success/20' : status === 'checked-out' ? 'bg-accent/25' : 'bg-primary/10'
+        )}>
+          <User className={cn(
+            'w-7 h-7',
+            status === 'checked-in' ? 'text-success' : status === 'checked-out' ? 'text-accent-foreground' : 'text-primary'
+          )} />
         </div>
-
-        {/* Info */}
+        
         <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-3 mb-1">
-            <div className="min-w-0">
-              <h3 className="font-semibold text-foreground truncate text-base">{child.name}</h3>
-              <p className="text-sm text-muted-foreground truncate">{child.parentName}</p>
-            </div>
-            <span className={cn('text-xs font-medium px-3 py-1 rounded-full whitespace-nowrap', config.badge)}>
-              {config.badgeText}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-2">
-            <Phone className="w-4 h-4" />
-            <span>{child.parentPhone}</span>
-          </div>
-
-          {child.allergiesNotes && child.allergiesNotes !== 'None' && (
-            <div className="flex items-center gap-1.5 text-xs text-destructive bg-destructive/10 px-2.5 py-1 rounded-md w-fit mt-2">
-              <AlertCircle className="w-3.5 h-3.5" />
-              <span>{child.allergiesNotes}</span>
-            </div>
-          )}
-
-          {record && (
-            <div className="mt-3 pt-3 border-t border-border space-y-1.5 text-sm">
-              {record.checkInTime && (
-                <div className="flex items-center gap-2 text-success">
-                  <Clock className="w-3.5 h-3.5" />
-                  <span>In: {record.checkInTime} by {record.droppedOffBy}</span>
-                </div>
-              )}
-              {record.checkOutTime && (
-                <div className="flex items-center gap-2 text-accent-foreground">
-                  <Clock className="w-3.5 h-3.5" />
-                  <span>Out: {record.checkOutTime} by {record.pickedUpBy}</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Action Buttons */}
-          <div className="mt-4">
-            {status === 'not-checked-in' && !showCheckIn && (
-              <Button
-                variant="checkin"
-                size="sm"
-                onClick={() => setShowCheckIn(true)}
-                className="gap-2"
-              >
-                <LogIn className="w-4 h-4" />
-                Check In
-              </Button>
-            )}
-
-            {status === 'checked-in' && !showCheckOut && (
-              <Button
-                variant="checkout"
-                size="sm"
-                onClick={() => setShowCheckOut(true)}
-                className="gap-2"
-              >
-                <LogOut className="w-4 h-4" />
-                Check Out
-              </Button>
-            )}
-
-            {status === 'checked-out' && !showCheckIn && (
-              <Button
-                variant="checkin"
-                size="sm"
-                onClick={() => setShowCheckIn(true)}
-                className="gap-2"
-              >
-                <LogIn className="w-4 h-4" />
-                Check In Again
-              </Button>
-            )}
-          </div>
+          <h3 className="font-bold text-foreground text-lg leading-tight truncate">{child.name}</h3>
+          <p className="text-sm text-muted-foreground truncate mt-0.5">{child.parentName}</p>
         </div>
       </div>
 
+      {/* Status Badge */}
+      <div className="mb-4">
+        <span className={cn(
+          'inline-flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-full',
+          config.badge
+        )}>
+          <span className={cn('w-1.5 h-1.5 rounded-full', config.badgeDot)} />
+          {config.badgeText}
+        </span>
+      </div>
+
+      {/* Contact Info */}
+      <div className="space-y-2 mb-4">
+        <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
+          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-muted/50">
+            <Phone className="w-4 h-4" />
+          </div>
+          <span className="font-medium">{child.parentPhone}</span>
+        </div>
+
+        {child.allergiesNotes && child.allergiesNotes !== 'None' && (
+          <div className="flex items-center gap-2.5">
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-destructive/10">
+              <AlertCircle className="w-4 h-4 text-destructive" />
+            </div>
+            <span className="text-sm font-medium text-destructive">{child.allergiesNotes}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Time Records */}
+      {record && (record.checkInTime || record.checkOutTime) && (
+        <div className="mb-4 p-3 rounded-xl bg-background/60 border border-border/50 space-y-2">
+          {record.checkInTime && (
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2 text-success">
+                <LogIn className="w-4 h-4" />
+                <span className="font-medium">In: {record.checkInTime}</span>
+              </div>
+              <span className="text-muted-foreground text-xs">by {record.droppedOffBy}</span>
+            </div>
+          )}
+          {record.checkOutTime && (
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2 text-accent-foreground">
+                <LogOut className="w-4 h-4" />
+                <span className="font-medium">Out: {record.checkOutTime}</span>
+              </div>
+              <span className="text-muted-foreground text-xs">by {record.pickedUpBy}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Action Buttons */}
+      <div className="mt-auto">
+        {status === 'not-checked-in' && !showCheckIn && (
+          <Button
+            variant="checkin"
+            size="default"
+            onClick={() => setShowCheckIn(true)}
+            className="w-full gap-2 font-semibold shadow-md hover:shadow-lg transition-shadow"
+          >
+            <LogIn className="w-4 h-4" />
+            Check In
+          </Button>
+        )}
+
+        {status === 'checked-in' && !showCheckOut && (
+          <Button
+            variant="checkout"
+            size="default"
+            onClick={() => setShowCheckOut(true)}
+            className="w-full gap-2 font-semibold shadow-md hover:shadow-lg transition-shadow"
+          >
+            <LogOut className="w-4 h-4" />
+            Check Out
+          </Button>
+        )}
+
+        {status === 'checked-out' && !showCheckIn && (
+          <Button
+            variant="outline"
+            size="default"
+            onClick={() => setShowCheckIn(true)}
+            className="w-full gap-2 font-semibold border-2 hover:bg-success/10 hover:border-success/50 hover:text-success transition-colors"
+          >
+            <LogIn className="w-4 h-4" />
+            Check In Again
+          </Button>
+        )}
+      </div>
+
+      {/* Check In Form */}
       {showCheckIn && (
-        <div className="mt-4 pt-4 border-t border-border animate-scale-in">
-          <p className="text-sm font-medium text-foreground mb-2">Who is dropping off?</p>
-          <div className="flex gap-2">
+        <div className="mt-4 pt-4 border-t border-border/50 animate-scale-in">
+          <p className="text-sm font-semibold text-foreground mb-3">Who is dropping off?</p>
+          <div className="space-y-3">
             <Input
               type="text"
               placeholder="Enter name..."
               value={droppedOffBy}
               onChange={(e) => setDroppedOffBy(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleCheckIn()}
-              className="flex-1"
+              className="h-11"
               autoFocus
             />
-            <Button variant="checkin" onClick={handleCheckIn} disabled={!droppedOffBy.trim()}>
-              Confirm
-            </Button>
-            <Button variant="outline" onClick={() => setShowCheckIn(false)}>
-              Cancel
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="checkin" onClick={handleCheckIn} disabled={!droppedOffBy.trim()} className="flex-1 font-semibold">
+                Confirm
+              </Button>
+              <Button variant="outline" onClick={() => setShowCheckIn(false)} className="flex-1">
+                Cancel
+              </Button>
+            </div>
           </div>
         </div>
       )}
 
+      {/* Check Out Form */}
       {showCheckOut && (
-        <div className="mt-4 pt-4 border-t border-border animate-scale-in">
-          <p className="text-sm font-medium text-foreground mb-2">Who is picking up?</p>
-          <div className="flex gap-2">
+        <div className="mt-4 pt-4 border-t border-border/50 animate-scale-in">
+          <p className="text-sm font-semibold text-foreground mb-3">Who is picking up?</p>
+          <div className="space-y-3">
             <Input
               type="text"
               placeholder="Enter name..."
               value={pickedUpBy}
               onChange={(e) => setPickedUpBy(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleCheckOut()}
-              className="flex-1"
+              className="h-11"
               autoFocus
             />
-            <Button variant="checkout" onClick={handleCheckOut} disabled={!pickedUpBy.trim()}>
-              Confirm
-            </Button>
-            <Button variant="outline" onClick={() => setShowCheckOut(false)}>
-              Cancel
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="checkout" onClick={handleCheckOut} disabled={!pickedUpBy.trim()} className="flex-1 font-semibold">
+                Confirm
+              </Button>
+              <Button variant="outline" onClick={() => setShowCheckOut(false)} className="flex-1">
+                Cancel
+              </Button>
+            </div>
           </div>
         </div>
       )}
