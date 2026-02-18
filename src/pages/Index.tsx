@@ -17,6 +17,7 @@ const ITEMS_PER_PAGE = 12;
 
 const Index = () => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSyncing, setIsSyncing] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [statusFilter, setStatusFilter] = useState<FilterStatus>('all');
   const [currentPage, setCurrentPage] = useState(1);
