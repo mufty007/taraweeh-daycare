@@ -9,7 +9,7 @@ import { StatusFilter, FilterStatus } from '@/components/StatusFilter';
 import { useAttendance } from '@/hooks/useAttendance';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
-import { RefreshCw, Loader2, History, CloudUpload } from 'lucide-react';
+import { RefreshCw, Loader2, History, CloudUpload, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { loadAttendanceFromStorage, syncTodayToSheet } from '@/services/googleSheetsApi';
 
@@ -118,6 +118,36 @@ const Index = () => {
     }
   };
 
+  const handleExportCSV = () => {
+    const records = loadAttendanceFromStorage();
+    if (records.length === 0) {
+      toast.info('No records to export for today');
+      return;
+    }
+    const header = 'Child Name,Parent Name,Parent Phone,Check-In Time,Dropped Off By,Check-Out Time,Picked Up By,Date';
+    const rows = records.map(r =>
+      [
+        r.childName,
+        r.parentName,
+        r.parentPhone,
+        r.checkInTime || '',
+        r.droppedOffBy || '',
+        r.checkOutTime || '',
+        r.pickedUpBy || '',
+        r.date,
+      ].map(v => `"${v}"`).join(',')
+    );
+    const csv = [header, ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `attendance-${new Date().toLocaleDateString('en-CA')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${records.length} record(s) as CSV`);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
       <Header />
@@ -145,6 +175,15 @@ const Index = () => {
                 </Button>
               </div>
               <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportCSV}
+                  title="Download today's attendance as CSV"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Export CSV
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
