@@ -118,13 +118,8 @@ export function useAttendance() {
         dropOffPerson: droppedOffBy,
       });
     } catch (err) {
-      console.error('Error checking in:', err);
-      setTodayRecords(prev => {
-        const reverted = prev.filter(r => r.childId !== childId);
-        persistRecords(reverted);
-        return reverted;
-      });
-      throw err;
+      // Sheet sync failed — localStorage record is kept as source of truth
+      console.warn('Sheet check-in sync failed:', err);
     }
   }, [children, persistRecords]);
 
@@ -151,17 +146,8 @@ export function useAttendance() {
         pickUpPerson: pickedUpBy,
       });
     } catch (err) {
-      console.error('Error checking out:', err);
-      setTodayRecords(prev => {
-        const reverted = prev.map(record => 
-          record.childId === childId
-            ? { ...record, checkOutTime: null, pickedUpBy: null }
-            : record
-        );
-        persistRecords(reverted);
-        return reverted;
-      });
-      throw err;
+      // Sheet sync failed — localStorage record is kept as source of truth
+      console.warn('Sheet check-out sync failed:', err);
     }
   }, [children, persistRecords]);
 

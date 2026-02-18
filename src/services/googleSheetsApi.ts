@@ -156,17 +156,18 @@ export function loadAllHistoryFromStorage(): StoredAttendanceRecord[] {
 }
 
 async function postToScript(body: object): Promise<void> {
-  // text/plain;charset=utf-8 avoids CORS preflight on Google Apps Script.
-  // redirect: 'follow' ensures the POST body is fully received before redirect.
-  const response = await fetch(SCRIPT_URL, {
-    method: 'POST',
-    redirect: 'follow',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(body),
-  });
-  // Response may be opaque after redirect — just check it didn't hard-fail
-  if (!response.ok && response.type !== 'opaque') {
-    throw new Error(`Script error: ${response.status}`);
+  // Fire-and-forget: Google Apps Script redirects cross-origin so we can't
+  // read the response. We use no-cors to send the data without a preflight.
+  // Errors are swallowed so localStorage stays as the source of truth for UI.
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(body),
+    });
+  } catch (err) {
+    console.warn('Google Sheet sync failed (non-critical):', err);
   }
 }
 
