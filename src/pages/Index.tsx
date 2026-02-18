@@ -9,13 +9,15 @@ import { StatusFilter, FilterStatus } from '@/components/StatusFilter';
 import { useAttendance } from '@/hooks/useAttendance';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
-import { RefreshCw, Loader2, History } from 'lucide-react';
+import { RefreshCw, Loader2, History, CloudUpload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { loadAttendanceFromStorage, syncTodayToSheet } from '@/services/googleSheetsApi';
 
 const ITEMS_PER_PAGE = 12;
 
 const Index = () => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSyncing, setIsSyncing] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [statusFilter, setStatusFilter] = useState<FilterStatus>('all');
   const [currentPage, setCurrentPage] = useState(1);
@@ -97,6 +99,25 @@ const Index = () => {
 
   const stats = getStats();
 
+  const handleSyncToSheet = async () => {
+    setIsSyncing(true);
+    try {
+      const records = loadAttendanceFromStorage();
+      if (records.length === 0) {
+        toast.info('No records to sync for today');
+        return;
+      }
+      const { synced } = await syncTodayToSheet(records);
+      toast.success(`Synced ${synced} record(s) to Google Sheet`, {
+        description: 'Check the Daily Attendance tab in your sheet.',
+      });
+    } catch {
+      toast.error('Sync failed — please try again');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
       <Header />
@@ -124,6 +145,20 @@ const Index = () => {
                 </Button>
               </div>
               <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSyncToSheet}
+                  disabled={isSyncing}
+                  title="Sync today's attendance to Google Sheet"
+                >
+                  {isSyncing ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <CloudUpload className="w-4 h-4 mr-2" />
+                  )}
+                  Sync Sheet
+                </Button>
                 <Link to="/history">
                   <Button variant="outline" size="sm">
                     <History className="w-4 h-4 mr-2" />
