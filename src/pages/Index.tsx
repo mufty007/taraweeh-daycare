@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { StatsCards } from '@/components/StatsCards';
@@ -73,6 +73,23 @@ const Index = () => {
     };
   }, [children, getChildStatus]);
 
+  // Auto-sync to Google Sheet after every action (fire-and-forget)
+  const autoSync = useCallback(() => {
+    const records = loadAttendanceFromStorage();
+    if (records.length > 0) {
+      syncTodayToSheet(records).catch(() => {
+        // Silent — localStorage is source of truth
+      });
+    }
+  }, []);
+
+  // Refetch children list whenever window regains focus (picks up new Google Form signups)
+  useEffect(() => {
+    const onFocus = () => refetch();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [refetch]);
+
   const handleCheckIn = async (childId: string, droppedOffBy: string) => {
     const child = children.find(c => c.id === childId);
     try {
@@ -80,6 +97,7 @@ const Index = () => {
       toast.success(`${child?.name} checked in`, {
         description: `Dropped off by ${droppedOffBy}`,
       });
+      autoSync();
     } catch {
       toast.error(`Failed to check in ${child?.name}`);
     }
@@ -92,6 +110,7 @@ const Index = () => {
       toast.success(`${child?.name} checked out`, {
         description: `Picked up by ${pickedUpBy}`,
       });
+      autoSync();
     } catch {
       toast.error(`Failed to check out ${child?.name}`);
     }
