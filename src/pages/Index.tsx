@@ -145,6 +145,20 @@ const Index = () => {
                 </Button>
               </div>
               <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSyncToSheet}
+                  disabled={isSyncing}
+                  title="Sync today's attendance to Google Sheet"
+                >
+                  {isSyncing ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <CloudUpload className="w-4 h-4 mr-2" />
+                  )}
+                  Sync Sheet
+                </Button>
                 <Link to="/history">
                   <Button variant="outline" size="sm">
                     <History className="w-4 h-4 mr-2" />
