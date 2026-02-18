@@ -102,13 +102,57 @@ export async function getRegisteredChildren(): Promise<ChildrenResponse> {
   };
 }
 
-export async function getTodayAttendance(): Promise<AttendanceResponse> {
-  const url = `${SCRIPT_URL}?action=getAttendance`;
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error('Failed to fetch attendance');
+// ── localStorage helpers ──────────────────────────────────────────────────
+
+const STORAGE_PREFIX = 'attendance_';
+
+function todayKey(): string {
+  return STORAGE_PREFIX + new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+}
+
+export interface StoredAttendanceRecord {
+  id: string;
+  date: string;
+  childId: string;
+  childName: string;
+  parentName: string;
+  parentPhone: string;
+  checkInTime: string | null;
+  droppedOffBy: string | null;
+  checkOutTime: string | null;
+  pickedUpBy: string | null;
+}
+
+export function saveAttendanceToStorage(records: StoredAttendanceRecord[]): void {
+  localStorage.setItem(todayKey(), JSON.stringify(records));
+}
+
+export function loadAttendanceFromStorage(): StoredAttendanceRecord[] {
+  try {
+    const raw = localStorage.getItem(todayKey());
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
   }
-  return response.json();
+}
+
+export function loadAllHistoryFromStorage(): StoredAttendanceRecord[] {
+  const all: StoredAttendanceRecord[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith(STORAGE_PREFIX)) {
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const records: StoredAttendanceRecord[] = JSON.parse(raw);
+          all.push(...records);
+        }
+      } catch {
+        // skip corrupt entries
+      }
+    }
+  }
+  return all.sort((a, b) => b.date.localeCompare(a.date));
 }
 
 export async function checkInChild(data: CheckInData): Promise<ActionResponse> {
@@ -157,30 +201,4 @@ export async function checkOutChild(data: CheckOutData): Promise<ActionResponse>
   return response.json();
 }
 
-export async function getAttendanceHistory(): Promise<HistoryRecord[]> {
-  // Use getAttendance to fetch today's data since script doesn't have getHistory action
-  const url = `${SCRIPT_URL}?action=getAttendance`;
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error('Failed to fetch history');
-  }
-  const json = await response.json();
-  
-  if (json.attendance) {
-    return Object.entries(json.attendance).map(([childName, data]) => {
-      const record = data as AttendanceRecord;
-      return {
-        date: json.date || new Date().toLocaleDateString(),
-        childName,
-        parentName: '',
-        parentPhone: '',
-        checkInTime: record.checkInTime || '',
-        droppedOffBy: record.dropOffPerson || '',
-        checkOutTime: '',
-        pickedUpBy: '',
-      };
-    });
-  }
-  
-  return [];
-}
+// getAttendanceHistory is replaced by loadAllHistoryFromStorage (localStorage-based)

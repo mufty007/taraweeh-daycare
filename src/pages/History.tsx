@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Header } from '@/components/Header';
-import { getAttendanceHistory, HistoryRecord } from '@/services/googleSheetsApi';
-import { Loader2, Calendar, ArrowLeft } from 'lucide-react';
+import { loadAllHistoryFromStorage, StoredAttendanceRecord } from '@/services/googleSheetsApi';
+import { Calendar, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import {
@@ -15,48 +15,28 @@ import {
 import { Badge } from '@/components/ui/badge';
 
 const History = () => {
-  const [records, setRecords] = useState<HistoryRecord[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [records, setRecords] = useState<StoredAttendanceRecord[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>('');
 
   useEffect(() => {
-    async function fetchHistory() {
-      try {
-        setIsLoading(true);
-        const data = await getAttendanceHistory();
-        setRecords(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load history');
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    fetchHistory();
+    setRecords(loadAllHistoryFromStorage());
   }, []);
 
-  // Get unique dates
   const uniqueDates = [...new Set(records.map(r => r.date))].sort((a, b) => 
-    new Date(b).getTime() - new Date(a).getTime()
+    b.localeCompare(a)
   );
 
-  // Filter by selected date
   const filteredRecords = selectedDate
     ? records.filter(r => r.date === selectedDate)
     : records;
 
-  // Group by date
   const groupedRecords = filteredRecords.reduce((acc, record) => {
-    if (!acc[record.date]) {
-      acc[record.date] = [];
-    }
+    if (!acc[record.date]) acc[record.date] = [];
     acc[record.date].push(record);
     return acc;
-  }, {} as Record<string, HistoryRecord[]>);
+  }, {} as Record<string, StoredAttendanceRecord[]>);
 
-  const sortedDates = Object.keys(groupedRecords).sort((a, b) => 
-    new Date(b).getTime() - new Date(a).getTime()
-  );
+  const sortedDates = Object.keys(groupedRecords).sort((a, b) => b.localeCompare(a));
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
@@ -74,7 +54,6 @@ const History = () => {
         </div>
 
         <div className="bg-card rounded-2xl border border-border p-6 shadow-lg shadow-primary/5">
-          {/* Date Filter */}
           <div className="flex flex-wrap items-center gap-3 mb-6">
             <Calendar className="w-5 h-5 text-muted-foreground" />
             <select
@@ -94,19 +73,11 @@ const History = () => {
             )}
           </div>
 
-          {error && (
-            <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-lg mb-4">
-              {error}
-            </div>
-          )}
-
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            </div>
-          ) : records.length === 0 ? (
+          {records.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              <p className="text-lg">No attendance records found</p>
+              <Calendar className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p className="text-lg font-medium">No attendance records yet</p>
+              <p className="text-sm mt-1">Records will appear here after children are checked in.</p>
             </div>
           ) : (
             <div className="space-y-8">

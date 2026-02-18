@@ -2,11 +2,11 @@ import { useState, useCallback, useEffect } from 'react';
 import { AttendanceRecord, AttendanceStatus, Child } from '@/types/attendance';
 import { 
   getRegisteredChildren, 
-  getTodayAttendance, 
   checkInChild, 
   checkOutChild,
+  saveAttendanceToStorage,
+  loadAttendanceFromStorage,
   RegistrationChild,
-  AttendanceRecord as ApiAttendanceRecord
 } from '@/services/googleSheetsApi';
 
 function getCurrentTime(): string {
@@ -23,22 +23,21 @@ export function useAttendance() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch children and attendance from Google Sheets
+  const persistRecords = useCallback((records: AttendanceRecord[]) => {
+    saveAttendanceToStorage(records);
+  }, []);
+
   const fetchData = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
       
-      const [childrenRes, attendanceRes] = await Promise.all([
-        getRegisteredChildren(),
-        getTodayAttendance()
-      ]);
+      const childrenRes = await getRegisteredChildren();
 
       if (childrenRes.error) {
         throw new Error(childrenRes.error);
       }
 
-      // Map API children to our Child type
       const mappedChildren: Child[] = childrenRes.children.map((c: RegistrationChild) => ({
         id: c.id.toString(),
         name: c.childName,
@@ -50,30 +49,10 @@ export function useAttendance() {
 
       setChildren(mappedChildren);
 
-      // Map attendance to our records format
-      if (attendanceRes.attendance && !attendanceRes.error) {
-        const records: AttendanceRecord[] = [];
-        
-        Object.entries(attendanceRes.attendance).forEach(([childName, data]) => {
-          const child = mappedChildren.find(c => c.name === childName);
-          if (child && (data as ApiAttendanceRecord).checkedIn) {
-            records.push({
-              id: `${attendanceRes.date}-${child.id}`,
-              date: attendanceRes.date,
-              childId: child.id,
-              childName: child.name,
-              parentName: child.parentName,
-              parentPhone: child.parentPhone,
-              checkInTime: (data as ApiAttendanceRecord).checkInTime,
-              droppedOffBy: (data as ApiAttendanceRecord).dropOffPerson,
-              checkOutTime: null,
-              pickedUpBy: null,
-            });
-          }
-        });
-        
-        setTodayRecords(records);
-      }
+      // Load today's attendance from localStorage
+      const stored = loadAttendanceFromStorage();
+      setTodayRecords(stored as AttendanceRecord[]);
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data');
       console.error('Error fetching data:', err);
@@ -103,10 +82,9 @@ export function useAttendance() {
 
     const checkInTime = getCurrentTime();
     
-    // Create new record (clear previous checkout to allow re-check-in)
     const newRecord: AttendanceRecord = {
-      id: `${new Date().toLocaleDateString()}-${childId}-${Date.now()}`,
-      date: new Date().toLocaleDateString(),
+      id: `${new Date().toLocaleDateString('en-CA')}-${childId}-${Date.now()}`,
+      date: new Date().toLocaleDateString('en-CA'),
       childId,
       childName: child.name,
       parentName: child.parentName,
@@ -119,15 +97,17 @@ export function useAttendance() {
 
     setTodayRecords(prev => {
       const existing = prev.findIndex(r => r.childId === childId);
+      let updated: AttendanceRecord[];
       if (existing >= 0) {
-        const updated = [...prev];
+        updated = [...prev];
         updated[existing] = newRecord;
-        return updated;
+      } else {
+        updated = [...prev, newRecord];
       }
-      return [...prev, newRecord];
+      persistRecords(updated);
+      return updated;
     });
 
-    // Call API
     try {
       await checkInChild({
         childName: child.name,
@@ -138,11 +118,14 @@ export function useAttendance() {
       });
     } catch (err) {
       console.error('Error checking in:', err);
-      // Revert on error
-      setTodayRecords(prev => prev.filter(r => r.childId !== childId));
+      setTodayRecords(prev => {
+        const reverted = prev.filter(r => r.childId !== childId);
+        persistRecords(reverted);
+        return reverted;
+      });
       throw err;
     }
-  }, [children]);
+  }, [children, persistRecords]);
 
   const checkOut = useCallback(async (childId: string, pickedUpBy: string) => {
     const child = children.find(c => c.id === childId);
@@ -150,16 +133,16 @@ export function useAttendance() {
 
     const checkOutTime = getCurrentTime();
 
-    // Optimistic update
-    setTodayRecords(prev => 
-      prev.map(record => 
+    setTodayRecords(prev => {
+      const updated = prev.map(record => 
         record.childId === childId
           ? { ...record, checkOutTime, pickedUpBy }
           : record
-      )
-    );
+      );
+      persistRecords(updated);
+      return updated;
+    });
 
-    // Call API
     try {
       await checkOutChild({
         childName: child.name,
@@ -168,17 +151,18 @@ export function useAttendance() {
       });
     } catch (err) {
       console.error('Error checking out:', err);
-      // Revert on error
-      setTodayRecords(prev => 
-        prev.map(record => 
+      setTodayRecords(prev => {
+        const reverted = prev.map(record => 
           record.childId === childId
             ? { ...record, checkOutTime: null, pickedUpBy: null }
             : record
-        )
-      );
+        );
+        persistRecords(reverted);
+        return reverted;
+      });
       throw err;
     }
-  }, [children]);
+  }, [children, persistRecords]);
 
   const getStats = useCallback(() => {
     const checkedIn = todayRecords.filter(r => r.checkInTime && !r.checkOutTime).length;
