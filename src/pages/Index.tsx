@@ -99,6 +99,25 @@ const Index = () => {
 
   const stats = getStats();
 
+  const handleSyncToSheet = async () => {
+    setIsSyncing(true);
+    try {
+      const records = loadAttendanceFromStorage();
+      if (records.length === 0) {
+        toast.info('No records to sync for today');
+        return;
+      }
+      const { synced } = await syncTodayToSheet(records);
+      toast.success(`Synced ${synced} record(s) to Google Sheet`, {
+        description: 'Check the Daily Attendance tab in your sheet.',
+      });
+    } catch {
+      toast.error('Sync failed — please try again');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
       <Header />
