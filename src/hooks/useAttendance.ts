@@ -1,3 +1,4 @@
+// useAttendance — persists check-in/out to localStorage
 import { useState, useCallback, useEffect } from 'react';
 import { AttendanceRecord, AttendanceStatus, Child } from '@/types/attendance';
 import { 
