@@ -156,49 +156,49 @@ export function loadAllHistoryFromStorage(): StoredAttendanceRecord[] {
 }
 
 export async function checkInChild(data: CheckInData): Promise<ActionResponse> {
-  const response = await fetch(SCRIPT_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'text/plain',
-    },
-    body: JSON.stringify({
-      action: 'checkIn',
-      data: {
-        childName: data.childName,
-        parentName: data.parentName,
-        parentPhone: data.parentPhone,
-        checkInTime: data.checkInTime || getCurrentTime(),
-        dropOffPerson: data.dropOffPerson,
-      }
-    })
-  });
-  
-  if (!response.ok) {
-    throw new Error('Failed to check in');
+  // Use no-cors because Google Apps Script redirects, making response opaque.
+  // We fire-and-forget the sheet update; localStorage is the source of truth for UI.
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        action: 'checkIn',
+        data: {
+          childName: data.childName,
+          parentName: data.parentName,
+          parentPhone: data.parentPhone,
+          checkInTime: data.checkInTime || getCurrentTime(),
+          dropOffPerson: data.dropOffPerson,
+        }
+      })
+    });
+  } catch (err) {
+    console.warn('Sheet check-in POST failed (non-critical):', err);
   }
-  return response.json();
+  return { success: true };
 }
 
 export async function checkOutChild(data: CheckOutData): Promise<ActionResponse> {
-  const response = await fetch(SCRIPT_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'text/plain',
-    },
-    body: JSON.stringify({
-      action: 'checkOut',
-      data: {
-        childName: data.childName,
-        checkOutTime: data.checkOutTime || getCurrentTime(),
-        pickUpPerson: data.pickUpPerson,
-      }
-    })
-  });
-  
-  if (!response.ok) {
-    throw new Error('Failed to check out');
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        action: 'checkOut',
+        data: {
+          childName: data.childName,
+          checkOutTime: data.checkOutTime || getCurrentTime(),
+          pickUpPerson: data.pickUpPerson,
+        }
+      })
+    });
+  } catch (err) {
+    console.warn('Sheet check-out POST failed (non-critical):', err);
   }
-  return response.json();
+  return { success: true };
 }
 
 // getAttendanceHistory is replaced by loadAllHistoryFromStorage (localStorage-based)
