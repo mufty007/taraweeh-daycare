@@ -155,49 +155,44 @@ export function loadAllHistoryFromStorage(): StoredAttendanceRecord[] {
   return all.sort((a, b) => b.date.localeCompare(a.date));
 }
 
-export async function checkInChild(data: CheckInData): Promise<ActionResponse> {
-  // Use no-cors because Google Apps Script redirects, making response opaque.
-  // We fire-and-forget the sheet update; localStorage is the source of truth for UI.
-  try {
-    await fetch(SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({
-        action: 'checkIn',
-        data: {
-          childName: data.childName,
-          parentName: data.parentName,
-          parentPhone: data.parentPhone,
-          checkInTime: data.checkInTime || getCurrentTime(),
-          dropOffPerson: data.dropOffPerson,
-        }
-      })
-    });
-  } catch (err) {
-    console.warn('Sheet check-in POST failed (non-critical):', err);
+async function postToScript(body: object): Promise<void> {
+  // text/plain;charset=utf-8 avoids CORS preflight on Google Apps Script.
+  // redirect: 'follow' ensures the POST body is fully received before redirect.
+  const response = await fetch(SCRIPT_URL, {
+    method: 'POST',
+    redirect: 'follow',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(body),
+  });
+  // Response may be opaque after redirect — just check it didn't hard-fail
+  if (!response.ok && response.type !== 'opaque') {
+    throw new Error(`Script error: ${response.status}`);
   }
+}
+
+export async function checkInChild(data: CheckInData): Promise<ActionResponse> {
+  await postToScript({
+    action: 'checkIn',
+    data: {
+      childName: data.childName,
+      parentName: data.parentName,
+      parentPhone: data.parentPhone,
+      checkInTime: data.checkInTime || getCurrentTime(),
+      dropOffPerson: data.dropOffPerson,
+    },
+  });
   return { success: true };
 }
 
 export async function checkOutChild(data: CheckOutData): Promise<ActionResponse> {
-  try {
-    await fetch(SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({
-        action: 'checkOut',
-        data: {
-          childName: data.childName,
-          checkOutTime: data.checkOutTime || getCurrentTime(),
-          pickUpPerson: data.pickUpPerson,
-        }
-      })
-    });
-  } catch (err) {
-    console.warn('Sheet check-out POST failed (non-critical):', err);
-  }
+  await postToScript({
+    action: 'checkOut',
+    data: {
+      childName: data.childName,
+      checkOutTime: data.checkOutTime || getCurrentTime(),
+      pickUpPerson: data.pickUpPerson,
+    },
+  });
   return { success: true };
 }
 
