@@ -197,4 +197,35 @@ export async function checkOutChild(data: CheckOutData): Promise<ActionResponse>
   return { success: true };
 }
 
+// Sync all today's localStorage records to the Google Sheet
+export async function syncTodayToSheet(records: StoredAttendanceRecord[]): Promise<{ synced: number }> {
+  let synced = 0;
+  for (const record of records) {
+    if (record.checkInTime) {
+      await postToScript({
+        action: 'checkIn',
+        data: {
+          childName: record.childName,
+          parentName: record.parentName,
+          parentPhone: record.parentPhone,
+          checkInTime: record.checkInTime,
+          dropOffPerson: record.droppedOffBy || '',
+        },
+      });
+      synced++;
+    }
+    if (record.checkOutTime) {
+      await postToScript({
+        action: 'checkOut',
+        data: {
+          childName: record.childName,
+          checkOutTime: record.checkOutTime,
+          pickUpPerson: record.pickedUpBy || '',
+        },
+      });
+    }
+  }
+  return { synced };
+}
+
 // getAttendanceHistory is replaced by loadAllHistoryFromStorage (localStorage-based)
