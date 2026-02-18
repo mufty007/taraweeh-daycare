@@ -9,8 +9,9 @@ import { StatusFilter, FilterStatus } from '@/components/StatusFilter';
 import { useAttendance } from '@/hooks/useAttendance';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
-import { RefreshCw, Loader2, History } from 'lucide-react';
+import { RefreshCw, Loader2, History, CloudUpload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { loadAttendanceFromStorage, syncTodayToSheet } from '@/services/googleSheetsApi';
 
 const ITEMS_PER_PAGE = 12;
 
