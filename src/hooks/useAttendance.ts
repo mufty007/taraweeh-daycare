@@ -1,5 +1,5 @@
 // useAttendance — persists check-in/out to Supabase with realtime sync
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { AttendanceRecord, AttendanceStatus, Child } from '@/types/attendance';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -21,11 +21,53 @@ function todayDate(): string {
   return new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
 }
 
+// Map from DB UUID child_id → external (Sheet) id
+// so we can match attendance records to the children list
+type IdMap = Map<string, string>; // dbUuid → externalId
+
 export function useAttendance() {
   const [children, setChildren] = useState<Child[]>([]);
   const [todayRecords, setTodayRecords] = useState<AttendanceRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Maps DB UUID → external/sheet ID for matching
+  const idMapRef = useRef<IdMap>(new Map());
+
+  // Build the id map from children table
+  const buildIdMap = useCallback(async () => {
+    const { data } = await supabase
+      .from('children')
+      .select('id, external_id');
+    if (data) {
+      const map = new Map<string, string>();
+      for (const row of data) {
+        if (row.external_id) {
+          map.set(row.id, row.external_id);
+        }
+      }
+      idMapRef.current = map;
+    }
+  }, []);
+
+  // Convert DB attendance rows to AttendanceRecord using external ids
+  const mapAttendanceRows = useCallback((rows: any[]): AttendanceRecord[] => {
+    return rows.map((r: any) => {
+      // Resolve external_id from the id map so status matching works
+      const externalId = idMapRef.current.get(r.child_id) || r.child_id;
+      return {
+        id: r.id,
+        date: r.date,
+        childId: externalId,
+        childName: r.child_name,
+        parentName: r.parent_name,
+        parentPhone: r.parent_phone,
+        checkInTime: r.check_in_time,
+        droppedOffBy: r.dropped_off_by,
+        checkOutTime: r.check_out_time,
+        pickedUpBy: r.picked_up_by,
+      };
+    });
+  }, []);
 
   // Sync children from Google Sheet → Supabase children table
   const syncChildrenToDb = useCallback(async (sheetChildren: Child[]) => {
@@ -44,49 +86,67 @@ export function useAttendance() {
     }
   }, []);
 
+  // Fallback: load children from DB if Google Sheets is down
+  const loadChildrenFromDb = useCallback(async (): Promise<Child[]> => {
+    const { data } = await supabase
+      .from('children')
+      .select('*')
+      .order('child_name');
+    if (!data || data.length === 0) return [];
+    return data.map((c: any) => ({
+      id: c.external_id || c.id,
+      name: c.child_name,
+      parentName: c.parent_name,
+      parentPhone: c.parent_phone,
+      parentEmail: c.parent_email,
+      allergiesNotes: c.allergies_notes,
+    }));
+  }, []);
+
   const fetchData = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
       
-      // 1. Fetch children from Google Sheet (source of truth for registrations)
-      const childrenRes = await getRegisteredChildren();
-      if (childrenRes.error) throw new Error(childrenRes.error);
+      let mappedChildren: Child[];
 
-      const mappedChildren: Child[] = childrenRes.children.map((c: RegistrationChild) => ({
-        id: c.id.toString(),
-        name: c.childName,
-        parentName: c.parentName,
-        parentPhone: c.parentPhone,
-        parentEmail: c.parentEmail,
-        allergiesNotes: c.allergies || 'None',
-      }));
+      // 1. Try Google Sheet first, fall back to DB
+      try {
+        const childrenRes = await getRegisteredChildren();
+        if (childrenRes.error) throw new Error(childrenRes.error);
+
+        mappedChildren = childrenRes.children.map((c: RegistrationChild) => ({
+          id: c.id.toString(),
+          name: c.childName,
+          parentName: c.parentName,
+          parentPhone: c.parentPhone,
+          parentEmail: c.parentEmail,
+          allergiesNotes: c.allergies || 'None',
+        }));
+
+        // Sync to DB in background
+        syncChildrenToDb(mappedChildren).catch(() => {});
+      } catch (sheetErr) {
+        console.warn('Google Sheet unavailable, falling back to database:', sheetErr);
+        mappedChildren = await loadChildrenFromDb();
+        if (mappedChildren.length === 0) {
+          throw new Error('Could not load children from Google Sheet or database');
+        }
+      }
 
       setChildren(mappedChildren);
 
-      // Sync to DB in background (so other devices get children list even if Sheet is down)
-      syncChildrenToDb(mappedChildren).catch(() => {});
+      // 2. Build the UUID → external_id map
+      await buildIdMap();
 
-      // 2. Load today's attendance from Supabase
+      // 3. Load today's attendance from Supabase
       const { data: attendanceData } = await supabase
         .from('attendance')
         .select('*')
         .eq('date', todayDate());
 
       if (attendanceData) {
-        const records: AttendanceRecord[] = attendanceData.map((r: any) => ({
-          id: r.id,
-          date: r.date,
-          childId: r.child_id,
-          childName: r.child_name,
-          parentName: r.parent_name,
-          parentPhone: r.parent_phone,
-          checkInTime: r.check_in_time,
-          droppedOffBy: r.dropped_off_by,
-          checkOutTime: r.check_out_time,
-          pickedUpBy: r.picked_up_by,
-        }));
-        setTodayRecords(records);
+        setTodayRecords(mapAttendanceRows(attendanceData));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data');
@@ -94,7 +154,7 @@ export function useAttendance() {
     } finally {
       setIsLoading(false);
     }
-  }, [syncChildrenToDb]);
+  }, [syncChildrenToDb, loadChildrenFromDb, buildIdMap, mapAttendanceRows]);
 
   useEffect(() => {
     fetchData();
@@ -120,18 +180,7 @@ export function useAttendance() {
             .eq('date', todayDate())
             .then(({ data }) => {
               if (data) {
-                setTodayRecords(data.map((r: any) => ({
-                  id: r.id,
-                  date: r.date,
-                  childId: r.child_id,
-                  childName: r.child_name,
-                  parentName: r.parent_name,
-                  parentPhone: r.parent_phone,
-                  checkInTime: r.check_in_time,
-                  droppedOffBy: r.dropped_off_by,
-                  checkOutTime: r.check_out_time,
-                  pickedUpBy: r.picked_up_by,
-                })));
+                setTodayRecords(mapAttendanceRows(data));
               }
             });
         }
@@ -141,7 +190,7 @@ export function useAttendance() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [mapAttendanceRows]);
 
   const getChildStatus = useCallback((childId: string): AttendanceStatus => {
     const record = todayRecords.find(r => r.childId === childId);
@@ -156,7 +205,6 @@ export function useAttendance() {
 
   // Helper: ensure child exists in DB and get its UUID
   const getOrCreateDbChild = useCallback(async (child: Child): Promise<string> => {
-    // Try to find by external_id
     const { data: existing } = await supabase
       .from('children')
       .select('id')
@@ -165,7 +213,6 @@ export function useAttendance() {
 
     if (existing) return existing.id;
 
-    // Insert new
     const { data: created } = await supabase
       .from('children')
       .insert({
@@ -189,7 +236,9 @@ export function useAttendance() {
     const checkInTime = getCurrentTime();
     const dbChildId = await getOrCreateDbChild(child);
 
-    // Upsert attendance record in Supabase
+    // Update the id map
+    idMapRef.current.set(dbChildId, childId);
+
     const { error: dbError } = await supabase
       .from('attendance')
       .upsert({
@@ -209,7 +258,7 @@ export function useAttendance() {
       throw dbError;
     }
 
-    // Optimistic update
+    // Optimistic update — use the external/sheet childId
     setTodayRecords(prev => {
       const existing = prev.findIndex(r => r.childId === childId);
       const newRecord: AttendanceRecord = {
