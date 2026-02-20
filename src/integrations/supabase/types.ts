@@ -14,7 +14,92 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      attendance: {
+        Row: {
+          check_in_time: string | null
+          check_out_time: string | null
+          child_id: string
+          child_name: string
+          created_at: string
+          date: string
+          dropped_off_by: string | null
+          id: string
+          parent_name: string
+          parent_phone: string
+          picked_up_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          check_in_time?: string | null
+          check_out_time?: string | null
+          child_id: string
+          child_name: string
+          created_at?: string
+          date?: string
+          dropped_off_by?: string | null
+          id?: string
+          parent_name: string
+          parent_phone?: string
+          picked_up_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          check_in_time?: string | null
+          check_out_time?: string | null
+          child_id?: string
+          child_name?: string
+          created_at?: string
+          date?: string
+          dropped_off_by?: string | null
+          id?: string
+          parent_name?: string
+          parent_phone?: string
+          picked_up_by?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_child_id_fkey"
+            columns: ["child_id"]
+            isOneToOne: false
+            referencedRelation: "children"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      children: {
+        Row: {
+          allergies_notes: string
+          child_name: string
+          created_at: string
+          external_id: string | null
+          id: string
+          parent_email: string
+          parent_name: string
+          parent_phone: string
+        }
+        Insert: {
+          allergies_notes?: string
+          child_name: string
+          created_at?: string
+          external_id?: string | null
+          id?: string
+          parent_email?: string
+          parent_name: string
+          parent_phone?: string
+        }
+        Update: {
+          allergies_notes?: string
+          child_name?: string
+          created_at?: string
+          external_id?: string | null
+          id?: string
+          parent_email?: string
+          parent_name?: string
+          parent_phone?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
