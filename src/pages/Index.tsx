@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { StatsCards } from '@/components/StatsCards';
@@ -9,15 +9,14 @@ import { StatusFilter, FilterStatus } from '@/components/StatusFilter';
 import { useAttendance } from '@/hooks/useAttendance';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
-import { RefreshCw, Loader2, History, CloudUpload, Download } from 'lucide-react';
+import { RefreshCw, Loader2, History, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { loadAttendanceFromStorage, syncTodayToSheet } from '@/services/googleSheetsApi';
+import { supabase } from '@/integrations/supabase/client';
 
 const ITEMS_PER_PAGE = 12;
 
 const Index = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSyncing, setIsSyncing] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [statusFilter, setStatusFilter] = useState<FilterStatus>('all');
   const [currentPage, setCurrentPage] = useState(1);
@@ -35,8 +34,6 @@ const Index = () => {
 
   const filteredChildren = useMemo(() => {
     let result = children;
-    
-    // Filter by search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       result = result.filter(child => 
@@ -44,16 +41,12 @@ const Index = () => {
         child.parentName.toLowerCase().includes(query)
       );
     }
-    
-    // Filter by status
     if (statusFilter !== 'all') {
       result = result.filter(child => getChildStatus(child.id) === statusFilter);
     }
-    
     return result;
   }, [children, searchQuery, statusFilter, getChildStatus]);
 
-  // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, statusFilter]);
@@ -73,16 +66,6 @@ const Index = () => {
     };
   }, [children, getChildStatus]);
 
-  // Auto-sync to Google Sheet after every action (fire-and-forget)
-  const autoSync = useCallback(() => {
-    const records = loadAttendanceFromStorage();
-    if (records.length > 0) {
-      syncTodayToSheet(records).catch(() => {
-        // Silent — localStorage is source of truth
-      });
-    }
-  }, []);
-
   // Refetch children list whenever window regains focus (picks up new Google Form signups)
   useEffect(() => {
     const onFocus = () => refetch();
@@ -97,7 +80,6 @@ const Index = () => {
       toast.success(`${child?.name} checked in`, {
         description: `Dropped off by ${droppedOffBy}`,
       });
-      autoSync();
     } catch {
       toast.error(`Failed to check in ${child?.name}`);
     }
@@ -110,7 +92,6 @@ const Index = () => {
       toast.success(`${child?.name} checked out`, {
         description: `Picked up by ${pickedUpBy}`,
       });
-      autoSync();
     } catch {
       toast.error(`Failed to check out ${child?.name}`);
     }
@@ -118,41 +99,27 @@ const Index = () => {
 
   const stats = getStats();
 
-  const handleSyncToSheet = async () => {
-    setIsSyncing(true);
-    try {
-      const records = loadAttendanceFromStorage();
-      if (records.length === 0) {
-        toast.info('No records to sync for today');
-        return;
-      }
-      const { synced } = await syncTodayToSheet(records);
-      toast.success(`Synced ${synced} record(s) to Google Sheet`, {
-        description: 'Check the Daily Attendance tab in your sheet.',
-      });
-    } catch {
-      toast.error('Sync failed — please try again');
-    } finally {
-      setIsSyncing(false);
-    }
-  };
+  const handleExportCSV = async () => {
+    const today = new Date().toLocaleDateString('en-CA');
+    const { data: records } = await supabase
+      .from('attendance')
+      .select('*')
+      .eq('date', today);
 
-  const handleExportCSV = () => {
-    const records = loadAttendanceFromStorage();
-    if (records.length === 0) {
+    if (!records || records.length === 0) {
       toast.info('No records to export for today');
       return;
     }
     const header = 'Child Name,Parent Name,Parent Phone,Check-In Time,Dropped Off By,Check-Out Time,Picked Up By,Date';
-    const rows = records.map(r =>
+    const rows = records.map((r: any) =>
       [
-        r.childName,
-        r.parentName,
-        r.parentPhone,
-        r.checkInTime || '',
-        r.droppedOffBy || '',
-        r.checkOutTime || '',
-        r.pickedUpBy || '',
+        r.child_name,
+        r.parent_name,
+        r.parent_phone,
+        r.check_in_time || '',
+        r.dropped_off_by || '',
+        r.check_out_time || '',
+        r.picked_up_by || '',
         r.date,
       ].map(v => `"${v}"`).join(',')
     );
@@ -161,7 +128,7 @@ const Index = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `attendance-${new Date().toLocaleDateString('en-CA')}.csv`;
+    a.download = `attendance-${today}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     toast.success(`Exported ${records.length} record(s) as CSV`);
@@ -202,20 +169,6 @@ const Index = () => {
                 >
                   <Download className="w-4 h-4 mr-2" />
                   Export CSV
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSyncToSheet}
-                  disabled={isSyncing}
-                  title="Sync today's attendance to Google Sheet"
-                >
-                  {isSyncing ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <CloudUpload className="w-4 h-4 mr-2" />
-                  )}
-                  Sync Sheet
                 </Button>
                 <Link to="/history">
                   <Button variant="outline" size="sm">

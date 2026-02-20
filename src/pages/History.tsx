@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Header } from '@/components/Header';
-import { loadAllHistoryFromStorage, StoredAttendanceRecord } from '@/services/googleSheetsApi';
+import { supabase } from '@/integrations/supabase/client';
 import { Calendar, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
@@ -14,12 +14,29 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 
+interface HistoryRecord {
+  id: string;
+  date: string;
+  child_name: string;
+  parent_name: string;
+  check_in_time: string | null;
+  dropped_off_by: string | null;
+  check_out_time: string | null;
+  picked_up_by: string | null;
+}
+
 const History = () => {
-  const [records, setRecords] = useState<StoredAttendanceRecord[]>([]);
+  const [records, setRecords] = useState<HistoryRecord[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>('');
 
   useEffect(() => {
-    setRecords(loadAllHistoryFromStorage());
+    supabase
+      .from('attendance')
+      .select('*')
+      .order('date', { ascending: false })
+      .then(({ data }) => {
+        if (data) setRecords(data as HistoryRecord[]);
+      });
   }, []);
 
   const uniqueDates = [...new Set(records.map(r => r.date))].sort((a, b) => 
@@ -34,7 +51,7 @@ const History = () => {
     if (!acc[record.date]) acc[record.date] = [];
     acc[record.date].push(record);
     return acc;
-  }, {} as Record<string, StoredAttendanceRecord[]>);
+  }, {} as Record<string, HistoryRecord[]>);
 
   const sortedDates = Object.keys(groupedRecords).sort((a, b) => b.localeCompare(a));
 
@@ -104,25 +121,25 @@ const History = () => {
                       </TableHeader>
                       <TableBody>
                         {groupedRecords[date].map((record, idx) => (
-                          <TableRow key={`${record.date}-${record.childName}-${idx}`}>
-                            <TableCell className="font-medium">{record.childName}</TableCell>
-                            <TableCell>{record.parentName}</TableCell>
+                          <TableRow key={`${record.date}-${record.child_name}-${idx}`}>
+                            <TableCell className="font-medium">{record.child_name}</TableCell>
+                            <TableCell>{record.parent_name}</TableCell>
                             <TableCell>
                               <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
-                                {record.checkInTime || '-'}
+                                {record.check_in_time || '-'}
                               </Badge>
                             </TableCell>
-                            <TableCell>{record.droppedOffBy || '-'}</TableCell>
+                            <TableCell>{record.dropped_off_by || '-'}</TableCell>
                             <TableCell>
-                              {record.checkOutTime ? (
+                              {record.check_out_time ? (
                                 <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30">
-                                  {record.checkOutTime}
+                                  {record.check_out_time}
                                 </Badge>
                               ) : (
                                 <span className="text-muted-foreground">-</span>
                               )}
                             </TableCell>
-                            <TableCell>{record.pickedUpBy || '-'}</TableCell>
+                            <TableCell>{record.picked_up_by || '-'}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
