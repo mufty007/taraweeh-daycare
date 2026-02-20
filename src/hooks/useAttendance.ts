@@ -1,4 +1,4 @@
-// useAttendance — persists check-in/out to Supabase with realtime sync
+// useAttendance — persists check-in/out to Supabase with realtime sync & DB fallback
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { AttendanceRecord, AttendanceStatus, Child } from '@/types/attendance';
 import { supabase } from '@/integrations/supabase/client';
